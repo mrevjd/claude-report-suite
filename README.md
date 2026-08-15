@@ -11,7 +11,7 @@ findings stay on the machine that produced them.
 
 ```
 /plugin marketplace add mrevjd/claude-report-suite
-/plugin install claude-report-suite
+/plugin install claude-report-suite@claude-report-suite
 ```
 
 Or copy a single skill into `~/.claude/skills/`:
