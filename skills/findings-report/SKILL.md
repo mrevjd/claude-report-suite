@@ -124,6 +124,25 @@ Field notes:
   though the link to the rate limiting is not proven") becomes the loudest thing on the card and
   crowds out the title. The caveat is what `why` is for; the badge is the index to it. Report a
   speculative finding as speculative rather than dropping it or promoting it.
+- **`status`** — `Open` (the default, and what you get by omitting it), `Fixed`, or `Accepted`.
+  Omit it entirely on a fresh report: every finding is open, a column of identical badges says
+  nothing, and the concept only earns its place once something has changed.
+
+  It earns its place when a report is **revisited after work has been done**. A resolved finding
+  sorts below everything still open, its severity stripe goes neutral, and **it stops counting
+  towards the severity chips**. That last part is the point: "1 Critical, 2 High" that silently
+  includes findings closed last week tells the reader there is more to do than there is, and a
+  count nobody can trust is worse than no count.
+
+  `Accepted` is for a finding nobody intends to fix. It is not a quiet way to make something go
+  away: it still renders, and the reason belongs in `resolution` where the next reader can argue
+  with it.
+- **`resolution`** — how a finding was closed and where, one or two sentences: "Fixed in 42a6e67,
+  the route is wrapped in the auth middleware and the handler can no longer authenticate anyone."
+  It renders as its own field labelled with the status. Put it here rather than appending to `fix`:
+  `fix` is what to do, `resolution` is what happened, and a reader picking the report up later needs
+  to tell those apart. On an open finding it renders as a plain note, which is the right place for
+  "tried X, it did not work".
 - **`id`** — short and stable (`F1`, `F2`). It is the anchor `highlights` links to, so keep the
   ids the source used; a reader holding the original report should find the same numbers here.
 - **`tags`** — checklist ids, CWEs, CVEs, rule names. Whatever lets someone trace the finding back.
@@ -138,6 +157,11 @@ Field notes:
   there are no findings; an empty block invites a downstream agent to invent work.
 
 ## The agent prompt block
+
+**Drop resolved findings from the block.** An entry for something already fixed produces a
+`SKIPPED-STALE` row and no work, because its anchor no longer matches. Leaving them in is not
+dangerous, the anchor rule handles it, but it wastes a downstream agent's pass and buries the
+entries that still matter.
 
 **If the source already emitted one, carry it across verbatim.** `claude-review-suite` specifies
 this artifact in `references/agent-prompt.md` and its reviews produce it; rewriting it loses the

@@ -26,6 +26,8 @@
     --sev-medium-bg: #fbf3e0;
     --sev-low-bg: #eaf1f9;
     --sev-info-bg: #eff1f4;
+    --resolved: #2f7d32;
+    --resolved-bg: #eaf4ea;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -49,6 +51,8 @@
       --sev-medium-bg: #332c14;
       --sev-low-bg: #1c2735;
       --sev-info-bg: #24272d;
+      --resolved: #8ed09a;
+      --resolved-bg: #16281a;
     }
   }
 
@@ -158,6 +162,17 @@
     color: var(--fg-muted); background: var(--sev-info-bg);
     text-transform: none; font-weight: 600; letter-spacing: 0;
   }
+  .badge-status[data-status="fixed"]    { color: var(--resolved); background: var(--resolved-bg); }
+  .badge-status[data-status="accepted"] { color: var(--fg-muted); background: var(--sev-info-bg); }
+
+  /* Resolved findings stay legible but stop competing with what is still open:
+     the severity stripe goes neutral so a closed Critical does not read as a
+     red alarm halfway down the page. */
+  .finding[data-status="fixed"], .finding[data-status="accepted"] {
+    border-left-color: var(--line-strong);
+    background: var(--bg-sunk);
+  }
+  .count-resolved { color: var(--resolved); }
   .tag { font-size: .72rem; font-family: ui-monospace, monospace; color: var(--fg-faint); }
 
   .loc { font-family: ui-monospace, monospace; font-size: .82rem; color: var(--fg-muted); word-break: break-all; margin-bottom: .7rem; }
@@ -238,6 +253,26 @@
 
   var SEV_ORDER = ["critical", "high", "medium", "low", "info"];
 
+  // A finding that is done is not a finding any more, it is a record. Resolved
+  // ones keep their place on the page so the report stays a full account of what
+  // was found, but they sort below everything still open and stop counting
+  // towards the severity tally, because "1 Critical" that was closed last week
+  // is a different sentence from "1 Critical".
+  var RESOLVED = { fixed: true, accepted: true };
+
+  function statusKey(status) {
+    return String(status || "open").trim().toLowerCase();
+  }
+
+  function isResolved(finding) {
+    return RESOLVED[statusKey(finding.status)] === true;
+  }
+
+  function statusName(finding) {
+    var s = statusKey(finding.status);
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   var DEMO = {
     title: "Findings report (template preview)",
     subtitle: "This is the unrendered template. Render it with scripts/render.sh to replace this sample.",
@@ -280,14 +315,14 @@
     return SEV_ORDER.indexOf(k) === -1 ? "info" : k;
   }
 
-  // A finding with no severity sorts after every scored one rather than
-  // silently claiming to be the least serious thing on the page.
+  // Open before resolved, then severity. A finding with no severity sorts after
+  // every scored one rather than silently claiming to be the least serious thing
+  // on the page.
   function sortFindings(findings) {
     return findings.slice().sort(function (a, b) {
-      var ai = SEV_ORDER.indexOf(sevKey(a.severity));
-      var bi = SEV_ORDER.indexOf(sevKey(b.severity));
-      if (ai !== bi) return ai - bi;
-      return 0;
+      var ar = isResolved(a) ? 1 : 0, br = isResolved(b) ? 1 : 0;
+      if (ar !== br) return ar - br;
+      return SEV_ORDER.indexOf(sevKey(a.severity)) - SEV_ORDER.indexOf(sevKey(b.severity));
     });
   }
 
@@ -376,6 +411,12 @@
 
     var head = el("div", "finding-head");
     if (f.id) head.appendChild(el("span", "fid", "[" + f.id + "]"));
+    if (f.status && statusKey(f.status) !== "open") {
+      var stb = el("span", "badge badge-status", f.status);
+      stb.setAttribute("data-status", statusKey(f.status));
+      head.appendChild(stb);
+      card.setAttribute("data-status", statusKey(f.status));
+    }
     if (f.severity) {
       var sb = el("span", "badge badge-sev", f.severity);
       sb.setAttribute("data-sev", key);
@@ -388,7 +429,8 @@
     if (f.title) card.appendChild(richEl("h3", null, f.title));
     if (f.location) card.appendChild(el("div", "loc", f.location));
 
-    [["What", f.what], ["Why", f.why], ["Fix", f.fix]].forEach(function (pair) {
+    [["What", f.what], ["Why", f.why], ["Fix", f.fix],
+     [isResolved(f) ? statusName(f) : "Note", f.resolution]].forEach(function (pair) {
       var node = field(pair[0], pair[1]);
       if (node) card.appendChild(node);
     });
@@ -429,8 +471,16 @@
     if (data.subtitle) tldr.appendChild(richEl("p", "verdict", data.subtitle));
     if (data.verdict) tldr.appendChild(richEl("p", "verdict", data.verdict));
 
-    var counts = {};
+    // The severity chips count what is still open. A tally that includes closed
+    // findings tells the reader there is more to do than there is, which is the
+    // one number on this page nobody should have to discount in their head.
+    var counts = {}, resolved = {};
     findings.forEach(function (f) {
+      if (isResolved(f)) {
+        var s = statusKey(f.status);
+        resolved[s] = (resolved[s] || 0) + 1;
+        return;
+      }
       var k = sevKey(f.severity);
       counts[k] = (counts[k] || 0) + 1;
     });
@@ -440,6 +490,9 @@
       var li = el("li", "count", counts[k] + " " + (k === "info" ? "unscored" : k));
       li.style.color = "var(--sev-" + k + ")";
       countList.appendChild(li);
+    });
+    Object.keys(resolved).forEach(function (s) {
+      countList.appendChild(el("li", "count count-resolved", resolved[s] + " " + s));
     });
     if (countList.childNodes.length) tldr.appendChild(countList);
 
@@ -465,8 +518,12 @@
       var ag = el("section", "agent");
       var ah = el("div", "agent-head");
       ah.appendChild(el("span", "agent-label", "Agent prompt"));
+      // Counts the open findings, not every finding on the page. The block
+      // should carry only what is still to do, so a total including resolved
+      // ones would advertise work that is not in the payload.
+      var openCount = findings.filter(function (f) { return !isResolved(f); }).length;
       ah.appendChild(el("span", "agent-note",
-        findings.length + (findings.length === 1 ? " finding" : " findings") +
+        openCount + (openCount === 1 ? " open finding" : " open findings") +
         " · re-verify each against current code before applying"));
       var ab = el("button", null, "Copy");
       ab.type = "button";
