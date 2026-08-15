@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runbook</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-sunk: #f6f7f9;
+    --bg-card: #ffffff;
+    --fg: #16181d;
+    --fg-muted: #5c6370;
+    --fg-faint: #858c99;
+    --line: #e3e6ea;
+    --line-strong: #cfd4db;
+    --accent: #2f5bd7;
+    --code-bg: #f4f5f7;
+    --danger: #b3261e;
+    --danger-bg: #fdecea;
+    --verify: #2f7d32;
+    --verify-bg: #eaf4ea;
+    --step: #16181d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --bg-sunk: #1a1d22;
+      --bg-card: #1c1f25;
+      --fg: #e6e8ec;
+      --fg-muted: #a2a9b5;
+      --fg-faint: #7d8593;
+      --line: #2b2f37;
+      --line-strong: #3b414b;
+      --accent: #7aa2f7;
+      --code-bg: #101216;
+      --danger: #ff8a80;
+      --danger-bg: #3a1c1a;
+      --verify: #8ed09a;
+      --verify-bg: #16281a;
+      --step: #e6e8ec;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  /* Wider than the findings report on purpose: a runbook's payload is commands,
+     and a wrapped curl line is harder to read than a long one. Prose inside is
+     capped separately so the sentences do not stretch with the code. */
+  main { max-width: 76rem; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+  .why, .expect, .cmd-note, .rollback, .goal p, .before li, .after li { max-width: 74ch; }
+  h1 { font-size: 1.65rem; line-height: 1.25; margin: 0 0 .4rem; }
+  h2 { font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); margin: 2.5rem 0 .9rem; }
+  h3 { font-size: 1.05rem; margin: 0; }
+  p { margin: 0 0 .8rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+  code { background: var(--code-bg); border-radius: 3px; padding: .1em .15em; font-size: .88em; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  .meta { color: var(--fg-muted); font-size: .9rem; margin: 0; }
+  .meta span + span::before { content: " · "; color: var(--fg-faint); }
+
+  .goal {
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.15rem 1.25rem;
+    margin-top: 1.6rem;
+  }
+  .goal h2 { margin: 0 0 .5rem; }
+  .goal p { font-size: 1.08rem; font-weight: 600; margin: 0; }
+
+  .before, .after { padding-left: 1.15rem; margin: 0; }
+  .before li, .after li { margin-bottom: .45rem; }
+
+  /* A step is the unit of work: number, what it is, why it is here, how to run
+     it, and how you know it worked. The number is large because a reader
+     mid-incident is looking for their place, not reading prose. */
+  .step {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0 1rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-card);
+    padding: 1.05rem 1.15rem;
+    margin-bottom: .9rem;
+  }
+  .step.danger { border-color: var(--danger); }
+  /* Without this a long command line inside a pre sets the grid track's
+     min-content width, so the whole page scrolls sideways instead of the pre.
+     Deploy runbooks are full of long lines, so this is the normal case. */
+  .step > * { min-width: 0; }
+  .n {
+    grid-row: 1 / span 99;
+    font-size: 1.5rem; font-weight: 700; line-height: 1.1;
+    color: var(--step); font-variant-numeric: tabular-nums;
+  }
+  .step-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin-bottom: .3rem; }
+  .closes { font-size: .72rem; font-family: ui-monospace, monospace; color: var(--fg-faint); }
+
+  .irreversible {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--danger); background: var(--danger-bg);
+    border-radius: 4px; padding: .18rem .5rem;
+    margin-bottom: .5rem;
+  }
+
+  .why {
+    font-size: .92rem; color: var(--fg-muted);
+    border-left: 2px solid var(--line-strong);
+    padding-left: .7rem; margin: .1rem 0 .7rem;
+  }
+
+  .label {
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--fg-faint); display: block; margin-bottom: .25rem;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: .7rem .85rem;
+    margin: 0;
+    /* Wrap rather than scroll: a runbook is read at whatever width the reader
+       has, often on a phone mid-deploy. pre-wrap wraps visually without
+       inserting real newlines, so a wrapped command still copies as the single
+       line it is and the Copy button stays correct. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: .84rem;
+    line-height: 1.5;
+  }
+  .cmd { position: relative; margin-bottom: .5rem; }
+  .cmd-note { font-size: .82rem; color: var(--fg-muted); margin: .4rem 0 0; }
+  .copy {
+    position: absolute; top: .4rem; right: .4rem;
+    font: inherit; font-size: .72rem; font-weight: 600;
+    padding: .15rem .5rem; border-radius: 5px;
+    border: 1px solid var(--line-strong); background: var(--bg-card); color: var(--fg-muted);
+    cursor: pointer; opacity: 0; transition: opacity .12s;
+  }
+  .cmd:hover .copy, .copy:focus { opacity: 1; }
+
+  .verify {
+    border-left: 3px solid var(--verify);
+    background: var(--verify-bg);
+    border-radius: 0 6px 6px 0;
+    padding: .6rem .75rem;
+    margin-top: .6rem;
+  }
+  .verify .label { color: var(--verify); }
+  .verify pre { background: var(--bg-card); }
+  .expect { font-size: .86rem; margin: .45rem 0 0; }
+  .expect b { font-weight: 700; }
+
+  .rollback { font-size: .86rem; color: var(--fg-muted); margin-top: .55rem; }
+  .rollback.none { color: var(--danger); }
+
+  .empty { color: var(--fg-muted); font-style: italic; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .82rem; color: var(--fg-faint); }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .copy { display: none; }
+    .step { break-inside: avoid; border: 1px solid #bbb; }
+    main { max-width: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<main id="runbook"></main>
+
+<script id="runbook-data" type="application/json">
+"__RUNBOOK_DATA__"
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var DEMO = {
+    title: "Runbook (template preview)",
+    goal: "This is the unrendered template. Render it with scripts/render.sh to replace this sample.",
+    before: ["A precondition the reader needs before starting."],
+    steps: [
+      {
+        n: 1,
+        title: "A sample step",
+        why_here: "Why this step sits at this position rather than later.",
+        closes: ["F1"],
+        commands: [{ code: "echo 'a command'", note: "What to watch for while it runs." }],
+        verify: { code: "echo 'a check'", expect: "What a good result looks like." },
+        rollback: "How to undo this, or that it cannot be undone."
+      }
+    ],
+    after: ["What is deliberately still open when this runbook is finished."]
+  };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+
+  // Steps arrive carrying markdown inline code as often as findings do.
+  // Backticks printed literally make a flag look like a typo.
+  function richText(text) {
+    var s = String(text);
+    var frag = document.createDocumentFragment();
+    var parts = s.split("`");
+    var coded = parts.length % 2 === 1; // unbalanced backticks: treat as plain
+    if (!coded) parts = [s];
+    parts.forEach(function (part, i) {
+      if (part === "") return;
+      if (coded && i % 2) { frag.appendChild(el("code", null, part)); return; }
+      // Bold only inside the non-code segments, so ** inside a command is safe.
+      var bits = part.split("**");
+      if (bits.length % 2 === 0) { frag.appendChild(document.createTextNode(part)); return; }
+      bits.forEach(function (b, j) {
+        if (b === "") return;
+        frag.appendChild(j % 2 ? el("strong", null, b) : document.createTextNode(b));
+      });
+    });
+    return frag;
+  }
+
+  function richEl(tag, cls, text) {
+    var n = el(tag, cls);
+    n.appendChild(richText(text));
+    return n;
+  }
+
+  function copyText(text, btn) {
+    var done = function () {
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  }
+
+  function fallback(text, done) {
+    var ta = el("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { /* nothing sensible left */ }
+    document.body.removeChild(ta);
+  }
+
+  function copyable(code) {
+    var wrap = el("div", "cmd");
+    wrap.appendChild(el("pre", null, code));
+    var btn = el("button", "copy", "Copy");
+    btn.type = "button";
+    btn.addEventListener("click", function () { copyText(code, btn); });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function renderStep(s, i) {
+    var card = el("article", "step" + (s.irreversible ? " danger" : ""));
+    card.id = "step-" + (s.n || i + 1);
+
+    card.appendChild(el("div", "n", s.n || i + 1));
+
+    var body = el("div");
+
+    var head = el("div", "step-head");
+    head.appendChild(richEl("h3", null, s.title || "Step " + (s.n || i + 1)));
+    (s.closes || []).forEach(function (c) {
+      head.appendChild(el("span", "closes", "closes " + c));
+    });
+    body.appendChild(head);
+
+    // The marker goes above the commands, never below: a reader needs to know
+    // a step cannot be undone before they have run it.
+    if (s.irreversible) {
+      body.appendChild(el("span", "irreversible", "Irreversible"));
+    }
+
+    if (s.why_here) body.appendChild(richEl("p", "why", s.why_here));
+
+    (s.commands || []).forEach(function (c, j) {
+      if (j === 0) body.appendChild(el("span", "label", "Run"));
+      body.appendChild(copyable(c.code || String(c)));
+      if (c.note) body.appendChild(el("p", "cmd-note", c.note));
+    });
+
+    if (s.verify) {
+      var v = el("div", "verify");
+      v.appendChild(el("span", "label", "Verify"));
+      if (s.verify.code) v.appendChild(copyable(s.verify.code));
+      if (s.verify.expect) {
+        var e = el("p", "expect");
+        e.appendChild(el("b", null, "Expect: "));
+        e.appendChild(richText(s.verify.expect));
+        v.appendChild(e);
+      }
+      body.appendChild(v);
+    }
+
+    if (s.rollback) {
+      var isNone = /^(none|not reversible|no rollback|cannot be undone)/i.test(String(s.rollback).trim());
+      var r = el("p", "rollback" + (isNone ? " none" : ""));
+      r.appendChild(el("b", null, "Rollback: "));
+      r.appendChild(richText(s.rollback));
+      body.appendChild(r);
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function list(root, heading, items, cls) {
+    if (!Array.isArray(items) || !items.length) return;
+    root.appendChild(el("h2", null, heading));
+    var ul = el("ul", cls);
+    items.forEach(function (t) { ul.appendChild(richEl("li", null, t)); });
+    root.appendChild(ul);
+  }
+
+  function render(data) {
+    var root = document.getElementById("runbook");
+    document.title = data.title || "Runbook";
+
+    root.appendChild(el("h1", null, data.title || "Runbook"));
+    if (Array.isArray(data.meta) && data.meta.length) {
+      var meta = el("p", "meta");
+      data.meta.forEach(function (m) { meta.appendChild(el("span", null, m)); });
+      root.appendChild(meta);
+    }
+
+    if (data.goal) {
+      var g = el("section", "goal");
+      g.appendChild(el("h2", null, "Goal"));
+      g.appendChild(richEl("p", null, data.goal));
+      root.appendChild(g);
+    }
+
+    list(root, "Before you start", data.before, "before");
+
+    root.appendChild(el("h2", null, "Steps"));
+    var steps = Array.isArray(data.steps) ? data.steps : [];
+    if (!steps.length) {
+      root.appendChild(el("p", "empty", "No steps."));
+    } else {
+      steps.forEach(function (s, i) { root.appendChild(renderStep(s, i)); });
+    }
+
+    list(root, "Still open afterwards", data.after, "after");
+
+    var foot = el("footer");
+    foot.textContent = data.footer ||
+      ("Generated " + (data.generated || "") + (data.source ? " from " + data.source : "")).trim();
+    root.appendChild(foot);
+  }
+
+  var raw;
+  try {
+    raw = JSON.parse(document.getElementById("runbook-data").textContent);
+  } catch (e) {
+    document.getElementById("runbook").appendChild(
+      el("p", "empty", "Runbook data is not valid JSON: " + e.message)
+    );
+    return;
+  }
+  render(typeof raw === "string" || raw === null ? DEMO : raw);
+})();
+</script>
+</body>
+</html>

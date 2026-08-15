@@ -1,0 +1,20 @@
+# Rendered output. The payload JSON is the source; the HTML is built from it.
+*.html
+!skills/*/assets/*.html
+
+# Packaged skills, rebuilt from source by skill-creator's package_skill.py
+*.skill
+
+# Eval workspaces live outside this repo, but catch them if one is ever run inside it
+*-workspace/
+.render/
+
+# Worktrees for in-flight feature work
+.worktrees/
+
+# Editor and OS noise
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

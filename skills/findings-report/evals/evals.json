@@ -1,0 +1,60 @@
+{
+  "skill_name": "findings-report",
+  "evals": [
+    {
+      "id": 0,
+      "name": "structured-security-report",
+      "prompt": "Here's the output of the security review I just ran on our checkout service. Can you turn it into a page I can actually look at? I want to send my lead the link to the file tomorrow morning and I don't want him scrolling a wall of markdown.\n\n---\n# Security review: checkout-svc\n\n**Scope:** 11 files from `git diff --name-only main...HEAD` (Go)\n**Passes run:** review-go\n**Tools run:** go vet, gitleaks\n**Verdict:** 1 Critical, 2 High, 2 Medium, 1 Low\n\n## Critical\n\n[F1] Critical \u00b7 Confirmed \u00b7 internal/config/secrets.go:22 \u00b7 SEC-04\n  What:   `const stripeKey = \"sk_live_51H...\"` is a live Stripe secret compiled into the binary.\n  Why:    Anyone with the binary or the repo can charge and refund against the live account. It has been in history since commit 9a3f1c2 (2025-03-04).\n  Fix:    Rotate the key in the Stripe dashboard, then read it from the environment.\n\n## High\n\n[F2] High \u00b7 Confirmed \u00b7 internal/api/orders.go:140 \u00b7 SEC-02\n  What:   `GET /orders/:id` fetches by id with no check that the caller owns the order.\n  Why:    Any logged-in customer can read any other customer's order, including shipping address and last four digits.\n  Fix:    Scope the query: `WHERE id = $1 AND customer_id = $2`.\n\n[F3] High \u00b7 Likely \u00b7 go.sum:88 \u00b7 SEC-06\n  What:   `github.com/dgrijalva/jwt-go v3.2.0` is unmaintained and vulnerable.\n  NVD:    CVE-2020-26160 \u00b7 CVSS 7.5 High \u00b7 CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N \u00b7 CWE-287 \u00b7 published 2020-09-30\n  Why:    Audience check can be bypassed when `aud` is a string rather than an array. Our verifier does read `aud`.\n  Fix:    Migrate to `github.com/golang-jwt/jwt/v5`.\n\n## Medium\n\n[F4] Medium \u00b7 Confirmed \u00b7 internal/api/orders.go:88 \u00b7 GO-06\n  What:   `json.Unmarshal` return value is discarded.\n  Why:    A malformed body yields a zero-valued order that is then written to the database.\n  Fix:    Check the error and return 400.\n\n[F5] Medium \u00b7 Speculative \u00b7 internal/worker/queue.go:51 \u00b7 GO-03\n  What:   A goroutine is started per message with no bound and no context cancellation.\n  Why:    A burst could exhaust memory. Not traced end to end, so reachability is unconfirmed.\n  Fix:    Bound with a worker pool and pass the request context.\n\n## Low\n\n[F6] Low \u00b7 Confirmed \u00b7 cmd/server/main.go:19 \u00b7 GO-06\n  What:   `defer db.Close()` in main is unreachable because the server exits via `log.Fatal`.\n  Why:    No current defect; connections are released by process exit.\n  Fix:    Drop the defer or exit through a shutdown path.\n\n## Checks skipped\n\n| Check | Reason | Install |\n|---|---|---|\n| staticcheck | not installed | `go install honnef.co/go/tools/cmd/staticcheck@latest` |\n| trivy | crashed: db download failed (exit 2) | already installed |\n---",
+      "expected_output": "A single self-contained HTML file. TL;DR names F1 as the blocker and says the key needs rotating rather than deleting. All six findings render as cards ordered Critical-to-Low, badges preserved, checklist IDs kept. The two skipped checks appear in a coverage section. A findings JSON sits alongside it. No browser opened, no Artifact published.",
+      "files": [],
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests (no http(s) src/href to a CDN, font, or script)",
+        "All six findings F1-F6 are present as separate cards",
+        "Findings are ordered Critical first, then High, Medium, Low",
+        "The TL;DR identifies F1 (the committed Stripe key) as the blocker",
+        "F1's remediation says the key must be rotated, not merely removed",
+        "Checklist IDs from the source (SEC-04, SEC-02, SEC-06, GO-06, GO-03) are preserved",
+        "Both skipped checks (staticcheck, trivy) appear in a coverage section",
+        "F5 is still marked Speculative rather than promoted or dropped",
+        "An editable JSON payload is saved alongside the HTML",
+        "No cross-finding ordered runbook section is present (that is out of scope for this skill)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "unstructured-debug-findings",
+      "prompt": "ok so that was a rough afternoon. can you write up what we found into an html page for the team wiki? off the top of my head: the retry loop in the sync worker doesn't back off at all so when the upstream 503s we hammer it about 400 times a second, that's almost certainly what got us rate limited. the config loader reads REDIS_URL but the compose file sets REDIS_HOST and REDIS_PORT so it's been silently falling back to localhost this whole time. and i'm fairly sure but not certain that the dedupe key includes the timestamp which would make it useless, didn't get a chance to prove that one. we never checked the staging box at all.",
+      "expected_output": "An HTML page from findings with no severity vocabulary, no file:line locations, and no rubric. Should not invent severities or checklist IDs it wasn't given. The uncertain dedupe-key item is clearly marked as unconfirmed rather than dropped or stated as fact, and the unchecked staging box shows up as a coverage gap.",
+      "files": [],
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "All three findings are rendered (retry backoff, REDIS_URL vs REDIS_HOST/PORT, dedupe key)",
+        "The dedupe-key finding is marked unconfirmed/speculative rather than asserted as fact",
+        "The unchecked staging box appears as a coverage gap, not as a finding",
+        "No checklist IDs are fabricated (no SEC-0x / GO-0x style tags that the source never gave)",
+        "No file:line locations are fabricated for findings that had none",
+        "An editable JSON payload is saved alongside the HTML"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "mixed-scanner-dump",
+      "prompt": "I've got raw npm audit output and a gitleaks run for the admin dashboard, plus three things I noticed by hand. Make me an html summary of the whole lot, one page, with the fix commands in it.\n\nnpm audit:\n  lodash  <4.17.19  high  Prototype Pollution  GHSA-p6mc-m468-83gg  fix available via `npm audit fix`\n  minimist  <1.2.6  critical  Prototype Pollution  GHSA-xvch-5gv4-984h  fix available via `npm audit fix --force`\n  postcss  <8.4.31  moderate  line return parsing error  GHSA-7fh5-64p2-3v2j  no fix available\n\ngitleaks:\n  Finding: SENDGRID_API_KEY=SG.actualkeyhere\n  File: .env.example\n  Line: 7\n  Commit: 4c1a2b8\n\nBy hand:\n  - admin routes are registered on a second router that skips the auth middleware\n  - the user list endpoint returns password_hash because it serialises the whole model\n  - we render markdown comments with v-html",
+      "expected_output": "One page merging scanner output and manual findings into a single ordered list. The auth-bypass and password_hash exposure should outrank the moderate postcss advisory in the TL;DR. Fix commands (npm audit fix, key rotation) appear per finding, not as one global runbook. The .env.example key is flagged as needing rotation.",
+      "files": [],
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "All seven items are present (lodash, minimist, postcss, SendGrid key, auth bypass, password_hash, v-html)",
+        "The auth bypass and the password_hash exposure rank above the moderate postcss advisory in the TL;DR",
+        "The SendGrid key in .env.example is flagged as needing rotation",
+        "Fix commands are attached to individual findings rather than collected into one global runbook",
+        "The postcss advisory states that no fix is available rather than inventing an upgrade command",
+        "GHSA advisory IDs from the source are preserved",
+        "An editable JSON payload is saved alongside the HTML"
+      ]
+    }
+  ]
+}

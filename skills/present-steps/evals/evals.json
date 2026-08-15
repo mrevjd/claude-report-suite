@@ -1,0 +1,75 @@
+{
+  "skill_name": "present-steps",
+  "evals": [
+    {
+      "id": 0,
+      "name": "findings-json-input",
+      "prompt": "Take the findings json at {findings_json} and turn it into a runbook page for me. I want to know what to do first without having to re-read the report and work it out myself.",
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "A steps JSON payload is saved alongside the HTML",
+        "Finding ids from the source (F1-F6) appear in closes fields",
+        "Rotating the Stripe key is ordered ahead of any history rewrite",
+        "Every step carries a why_here that gives a positional reason, not a restatement of the fix",
+        "Each step has a verify with an expect line saying what a good result looks like",
+        "Any irreversible step is flagged as irreversible"
+      ],
+      "files": [
+        "a findings.json produced by findings-report; substitute its path for {findings_json}"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "loose-incident",
+      "prompt": "we spent all night on this and i need to write up the fix order before i forget it. the queue consumer acks messages before it finishes processing them so anything that crashes mid-work is just gone, we found that at 2am. there's also a retry storm because the dead letter queue is wired back into the main queue (someone did that deliberately in march, no idea why). the alerting never fired at all because the pagerduty key in the worker config expired in june. and the runbook link in the alert description 404s. can you make me an html page with the steps in the right order",
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "A steps JSON payload is saved alongside the HTML",
+        "All four items appear as steps (early ack, DLQ loop, expired PagerDuty key, dead runbook link)",
+        "The expired PagerDuty key is ordered early, since nothing else is observable until alerting works",
+        "The DLQ rewiring is not simply reverted without noting that someone did it deliberately",
+        "No finding ids or severities are fabricated: the source gave none",
+        "Every step carries a why_here that gives a positional reason"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "dependency-knot",
+      "prompt": "We've got a mess and I need the order to do it in, not another list. Give me an html runbook.\n\n- [A] Critical: the reporting API returns other tenants' rows because the query never filters by tenant_id. The fix needs the new tenant_id column populated first.\n- [B] Low: tenant_id exists but is nullable and about half empty. There's a backfill script ready to go.\n- [C] Medium: the staging S3 bucket holding production data dumps is public. One console click to close.\n- [D] High: the worker needs a dependency bump for a known RCE. Rebuild and redeploy of the worker.\n- [E] High: the worker also has a hardcoded database password in its env file. Same rebuild.\n- [F] Medium: once the backfill is done we want tenant_id NOT NULL and the legacy tenant_name column dropped.",
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "A steps JSON payload is saved alongside the HTML",
+        "C (public bucket) is ordered ahead of A despite being lower severity, on stop-the-bleeding grounds",
+        "B (backfill) is ordered before A, because A depends on the column being populated",
+        "D and E are grouped into one deploy rather than two separate rebuild steps",
+        "F is last and flagged irreversible, since it drops a column",
+        "The order is not simply severity order (A, D, E, C, F, B)",
+        "why_here on at least one step cites a dependency or a deploy boundary rather than severity"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "given-order-deploy",
+      "prompt": "Can you turn our deploy doc into a proper runbook page? The steps are right, we've done this deploy a few times, but it's thin on how you know each bit worked and the rollback is all bunched at the bottom where it's no use to you at 2am. Don't rearrange it on me.\n\n---\n# Production deploy\n\n## Prerequisites\n- SSH access to the app server\n- Postgres 16 running on production\n- Local build tools\n\n## Step 1: Build the binaries\n`./build.sh` cross-compiles into `bin/`.\n\n## Step 2: Back up the database\n`pg_dump -Fc app > app-$(date +%F).dump`\n\n## Step 3: Apply migration 012\n`psql -d app -f migrations/012_retention.sql`. Adds two tables and nulls the `expires_at` column on the cache table.\n\n## Step 4: Deploy the backend\n`scp bin/* server:/opt/app/bin/ && ssh server 'systemctl restart app'`\n\n## Step 5: Run the backfill\n`ssh server '/opt/app/bin/backfill'`. Takes about 20 minutes.\n\n## Step 6: Deploy the frontend\n`rsync -a --delete-after dist/ server:/var/www/app/`\n\n## Step 7: Test the endpoints\nHit /api/health and a couple of the new routes.\n\n## Rollback\nStop the service, restore the dump, redeploy the previous binaries from git, restart.\n---",
+      "expected_output": "A runbook whose seven steps are in the source order, unchanged. Every step gains a verify with an expect line and its own rollback, pulled apart from the block at the bottom. Migration 012 is flagged irreversible because nulling expires_at discards values with no record of them. The step 2 dump is named as the recovery path for the irreversible work. Prerequisites reach `before`, along with anything the procedure implies but does not state, such as step 4's scp and step 6's rsync --delete-after both overwriting in place with no previous version kept.",
+      "files": [],
+      "expectations": [
+        "Exactly one .html file is produced in outputs/",
+        "The HTML makes no external network requests",
+        "A steps JSON payload is saved alongside the HTML",
+        "The seven steps appear in the source order, not reordered",
+        "Every step has a verify with an expect line",
+        "Every step has a rollback, including where the answer is that it cannot be undone",
+        "The migration step is flagged irreversible",
+        "The database backup is treated as the precondition for rollback, not just another step",
+        "before carries the prerequisites from the source document",
+        "closes is absent or carries non-finding identifiers; no finding ids are invented",
+        "Any grouping or splitting of the source steps is declared in why_here",
+        "Where the reason for a step's position is not recorded in the source, why_here says so rather than inventing a rationale"
+      ]
+    }
+  ]
+}

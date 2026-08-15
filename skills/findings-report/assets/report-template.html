@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Findings report</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-sunk: #f6f7f9;
+    --bg-card: #ffffff;
+    --fg: #16181d;
+    --fg-muted: #5c6370;
+    --fg-faint: #858c99;
+    --line: #e3e6ea;
+    --line-strong: #cfd4db;
+    --accent: #2f5bd7;
+    --code-bg: #f4f5f7;
+    --sev-critical: #b3261e;
+    --sev-high: #c04a12;
+    --sev-medium: #8a6100;
+    --sev-low: #3a6ea5;
+    --sev-info: #5c6370;
+    --sev-critical-bg: #fdecea;
+    --sev-high-bg: #fdefe6;
+    --sev-medium-bg: #fbf3e0;
+    --sev-low-bg: #eaf1f9;
+    --sev-info-bg: #eff1f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --bg-sunk: #1a1d22;
+      --bg-card: #1c1f25;
+      --fg: #e6e8ec;
+      --fg-muted: #a2a9b5;
+      --fg-faint: #7d8593;
+      --line: #2b2f37;
+      --line-strong: #3b414b;
+      --accent: #7aa2f7;
+      --code-bg: #101216;
+      --sev-critical: #ff8a80;
+      --sev-high: #ffab70;
+      --sev-medium: #e6c569;
+      --sev-low: #8ab4e8;
+      --sev-info: #a2a9b5;
+      --sev-critical-bg: #3a1c1a;
+      --sev-high-bg: #38241a;
+      --sev-medium-bg: #332c14;
+      --sev-low-bg: #1c2735;
+      --sev-info-bg: #24272d;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { font-size: 1.65rem; line-height: 1.25; margin: 0 0 .4rem; }
+  h2 { font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); margin: 2.5rem 0 .9rem; }
+  h3 { font-size: 1.02rem; margin: 0; }
+  p { margin: 0 0 .8rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+  .meta { color: var(--fg-muted); font-size: .9rem; margin: 0; }
+  .meta span + span::before { content: " · "; color: var(--fg-faint); }
+
+  .tldr {
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.15rem 1.25rem .9rem;
+    margin-top: 1.6rem;
+  }
+  .tldr h2 { margin: 0 0 .6rem; }
+  .verdict { font-size: 1.08rem; font-weight: 600; }
+  .counts { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; margin: 0 0 .9rem; }
+  .count {
+    font-size: .78rem; font-weight: 600; letter-spacing: .02em;
+    padding: .2rem .55rem; border-radius: 999px; border: 1px solid currentColor;
+  }
+  .highlights { margin: 0; padding-left: 1.15rem; }
+  .highlights li { margin-bottom: .4rem; }
+  .highlights li:last-child { margin-bottom: 0; }
+
+  /* The agent block sits under the TL;DR because that is where someone reaches
+     for it, but what is visible by default is the warning, not the payload. The
+     block is only safe to use after the findings are re-checked against current
+     code, and a wall of pasteable text invites skipping exactly that. */
+  .agent {
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    padding: .7rem .85rem;
+    margin-top: .9rem;
+  }
+  .agent-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+  .agent-label {
+    font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--fg-muted);
+  }
+  .agent-note { font-size: .82rem; color: var(--fg-faint); }
+  .agent button {
+    margin-left: auto;
+    font: inherit; font-size: .74rem; font-weight: 600;
+    padding: .18rem .6rem; border-radius: 5px;
+    border: 1px solid var(--line-strong); background: transparent; color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .agent button:hover { color: var(--fg); border-color: var(--fg-muted); }
+  .agent details { margin-top: .55rem; }
+  .agent summary { cursor: pointer; font-size: .8rem; color: var(--fg-muted); list-style: none; }
+  .agent summary::before { content: "▸ "; }
+  .agent details[open] summary::before { content: "▾ "; }
+  .agent pre { margin-top: .45rem; max-height: 26rem; overflow: auto; white-space: pre-wrap; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+  .filter {
+    font: inherit; font-size: .82rem; font-weight: 600;
+    padding: .28rem .7rem; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: transparent; color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .filter[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+  .finding {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--sev-info);
+    border-radius: 8px;
+    background: var(--bg-card);
+    padding: 1.05rem 1.15rem;
+    margin-bottom: .9rem;
+  }
+  .finding[data-sev="critical"] { border-left-color: var(--sev-critical); }
+  .finding[data-sev="high"]     { border-left-color: var(--sev-high); }
+  .finding[data-sev="medium"]   { border-left-color: var(--sev-medium); }
+  .finding[data-sev="low"]      { border-left-color: var(--sev-low); }
+
+  .finding-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin-bottom: .35rem; }
+  .fid { font-size: .82rem; font-weight: 700; color: var(--fg-faint); font-family: ui-monospace, monospace; }
+  .badge {
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    padding: .12rem .45rem; border-radius: 4px;
+  }
+  .badge-sev[data-sev="critical"] { color: var(--sev-critical); background: var(--sev-critical-bg); }
+  .badge-sev[data-sev="high"]     { color: var(--sev-high);     background: var(--sev-high-bg); }
+  .badge-sev[data-sev="medium"]   { color: var(--sev-medium);   background: var(--sev-medium-bg); }
+  .badge-sev[data-sev="low"]      { color: var(--sev-low);      background: var(--sev-low-bg); }
+  .badge-sev[data-sev="info"]     { color: var(--sev-info);     background: var(--sev-info-bg); }
+  /* Severity is a fixed vocabulary, so it can shout. Confidence is free text
+     and sometimes arrives longer than a word; uppercasing a whole clause turns
+     the badge row into the loudest thing on the card. */
+  .badge-conf {
+    color: var(--fg-muted); background: var(--sev-info-bg);
+    text-transform: none; font-weight: 600; letter-spacing: 0;
+  }
+  .tag { font-size: .72rem; font-family: ui-monospace, monospace; color: var(--fg-faint); }
+
+  .loc { font-family: ui-monospace, monospace; font-size: .82rem; color: var(--fg-muted); word-break: break-all; margin-bottom: .7rem; }
+
+  .field { display: grid; grid-template-columns: 4.6rem 1fr; gap: .6rem; margin-bottom: .55rem; }
+  /* A long unbreakable token in the value would otherwise set the track's
+     min-content width and scroll the page sideways rather than the block. */
+  .field > * { min-width: 0; }
+  .field:last-child { margin-bottom: 0; }
+  .field > .label {
+    font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--fg-faint); padding-top: .22rem;
+  }
+  .field.block { display: block; }
+  .field.block > .label { display: block; margin-bottom: .3rem; padding-top: 0; }
+
+  /* Horizontal padding on an inline chip reads as a space when the next
+     character is punctuation ("read `aud` , so"). Keep it tight and lean on the
+     background for separation instead. */
+  code {
+    background: var(--code-bg);
+    border-radius: 3px;
+    padding: .1em .15em;
+    font-size: .88em;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: .7rem .85rem;
+    margin: .35rem 0 0;
+    /* Wrap rather than scroll: a runbook is read at whatever width the reader
+       has. pre-wrap wraps visually without inserting real newlines, so a
+       wrapped command still copies as the single line it is. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: .84rem;
+    line-height: 1.5;
+  }
+  .cmd { position: relative; }
+  .cmd-note { font-size: .82rem; color: var(--fg-muted); margin: .5rem 0 0; }
+  .copy {
+    position: absolute; top: .4rem; right: .4rem;
+    font: inherit; font-size: .72rem; font-weight: 600;
+    padding: .15rem .5rem; border-radius: 5px;
+    border: 1px solid var(--line-strong); background: var(--bg-card); color: var(--fg-muted);
+    cursor: pointer; opacity: 0; transition: opacity .12s;
+  }
+  .cmd:hover .copy, .copy:focus { opacity: 1; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-faint); }
+
+  .empty { color: var(--fg-muted); font-style: italic; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .82rem; color: var(--fg-faint); }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .filters, .copy { display: none; }
+    .finding { break-inside: avoid; border: 1px solid #bbb; }
+    main { max-width: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<main id="report"></main>
+
+<script id="report-data" type="application/json">
+"__REPORT_DATA__"
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var SEV_ORDER = ["critical", "high", "medium", "low", "info"];
+
+  var DEMO = {
+    title: "Findings report (template preview)",
+    subtitle: "This is the unrendered template. Render it with scripts/render.sh to replace this sample.",
+    meta: ["sample data", "no real findings"],
+    verdict: "1 High, 1 Low - sample data only.",
+    highlights: [
+      { text: "A sample high-severity finding, to show how a highlight links to its card.", finding: "F1" }
+    ],
+    findings: [
+      {
+        id: "F1", severity: "High", confidence: "Confirmed",
+        title: "Sample finding title",
+        location: "path/to/file.ext:42",
+        tags: ["DEMO-01"],
+        what: "What the defect is, stated as a fact about the code.",
+        why: "Why it matters: the consequence, and who can reach it.",
+        fix: "What to change, specifically enough to act on.",
+        commands: [{ code: "echo 'a remediation command'", note: "Commands render with a copy button." }]
+      },
+      {
+        id: "F2", severity: "Low",
+        title: "A finding with no confidence or tags",
+        what: "Fields are optional: anything absent is simply not rendered."
+      }
+    ],
+    coverage: [
+      { check: "sample-scanner", reason: "not installed", note: "this table lists what did not run" }
+    ]
+  };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+
+  function sevKey(sev) {
+    var k = String(sev || "").trim().toLowerCase();
+    return SEV_ORDER.indexOf(k) === -1 ? "info" : k;
+  }
+
+  // A finding with no severity sorts after every scored one rather than
+  // silently claiming to be the least serious thing on the page.
+  function sortFindings(findings) {
+    return findings.slice().sort(function (a, b) {
+      var ai = SEV_ORDER.indexOf(sevKey(a.severity));
+      var bi = SEV_ORDER.indexOf(sevKey(b.severity));
+      if (ai !== bi) return ai - bi;
+      return 0;
+    });
+  }
+
+  // Findings arrive carrying markdown inline code far more often than not.
+  // Printing the backticks makes an identifier look like a typo, so honour the
+  // pairs and leave everything else alone. Text goes in via textContent
+  // throughout: nothing here ever parses the payload as markup.
+  function richText(text) {
+    var s = String(text);
+    var frag = document.createDocumentFragment();
+    var parts = s.split("`");
+    var coded = parts.length % 2 === 1; // unbalanced backticks: treat as plain
+    if (!coded) parts = [s];
+    parts.forEach(function (part, i) {
+      if (part === "") return;
+      if (coded && i % 2) { frag.appendChild(el("code", null, part)); return; }
+      // Bold only inside the non-code segments, so ** inside a command is safe.
+      var bits = part.split("**");
+      if (bits.length % 2 === 0) { frag.appendChild(document.createTextNode(part)); return; }
+      bits.forEach(function (b, j) {
+        if (b === "") return;
+        frag.appendChild(j % 2 ? el("strong", null, b) : document.createTextNode(b));
+      });
+    });
+    return frag;
+  }
+
+  function richEl(tag, cls, text) {
+    var n = el(tag, cls);
+    n.appendChild(richText(text));
+    return n;
+  }
+
+  function field(label, value) {
+    if (!value) return null;
+    var f = el("div", "field");
+    f.appendChild(el("span", "label", label));
+    f.appendChild(richEl("span", "value", value));
+    return f;
+  }
+
+  function copyable(code) {
+    var wrap = el("div", "cmd");
+    var pre = el("pre", null, code);
+    var btn = el("button", "copy", "Copy");
+    btn.type = "button";
+    btn.addEventListener("click", function () {
+      copyText(code, btn);
+    });
+    wrap.appendChild(pre);
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  // navigator.clipboard is unavailable on some file:// origins, so keep the
+  // execCommand path: a copy button that silently fails is worse than none.
+  function copyText(text, btn) {
+    var done = function () {
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  }
+
+  function fallback(text, done) {
+    var ta = el("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { /* nothing sensible left to try */ }
+    document.body.removeChild(ta);
+  }
+
+  function renderFinding(f) {
+    var key = sevKey(f.severity);
+    var card = el("article", "finding");
+    card.setAttribute("data-sev", key);
+    if (f.id) card.id = String(f.id);
+
+    var head = el("div", "finding-head");
+    if (f.id) head.appendChild(el("span", "fid", "[" + f.id + "]"));
+    if (f.severity) {
+      var sb = el("span", "badge badge-sev", f.severity);
+      sb.setAttribute("data-sev", key);
+      head.appendChild(sb);
+    }
+    if (f.confidence) head.appendChild(el("span", "badge badge-conf", f.confidence));
+    (f.tags || []).forEach(function (t) { head.appendChild(el("span", "tag", t)); });
+    card.appendChild(head);
+
+    if (f.title) card.appendChild(richEl("h3", null, f.title));
+    if (f.location) card.appendChild(el("div", "loc", f.location));
+
+    [["What", f.what], ["Why", f.why], ["Fix", f.fix]].forEach(function (pair) {
+      var node = field(pair[0], pair[1]);
+      if (node) card.appendChild(node);
+    });
+
+    if (f.evidence) {
+      var ev = el("div", "field block");
+      ev.appendChild(el("span", "label", "Evidence"));
+      ev.appendChild(el("pre", null, f.evidence));
+      card.appendChild(ev);
+    }
+
+    (f.commands || []).forEach(function (c, i) {
+      var block = el("div", "field block");
+      if (i === 0) block.appendChild(el("span", "label", "Commands"));
+      block.appendChild(copyable(c.code || String(c)));
+      if (c.note) block.appendChild(el("p", "cmd-note", c.note));
+      card.appendChild(block);
+    });
+
+    return card;
+  }
+
+  function render(data) {
+    var root = document.getElementById("report");
+    var findings = sortFindings(Array.isArray(data.findings) ? data.findings : []);
+
+    document.title = data.title || "Findings report";
+
+    root.appendChild(el("h1", null, data.title || "Findings report"));
+    if (Array.isArray(data.meta) && data.meta.length) {
+      var meta = el("p", "meta");
+      data.meta.forEach(function (m) { meta.appendChild(el("span", null, m)); });
+      root.appendChild(meta);
+    }
+
+    var tldr = el("section", "tldr");
+    tldr.appendChild(el("h2", null, "TL;DR"));
+    if (data.subtitle) tldr.appendChild(richEl("p", "verdict", data.subtitle));
+    if (data.verdict) tldr.appendChild(richEl("p", "verdict", data.verdict));
+
+    var counts = {};
+    findings.forEach(function (f) {
+      var k = sevKey(f.severity);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    var countList = el("ul", "counts");
+    SEV_ORDER.forEach(function (k) {
+      if (!counts[k]) return;
+      var li = el("li", "count", counts[k] + " " + (k === "info" ? "unscored" : k));
+      li.style.color = "var(--sev-" + k + ")";
+      countList.appendChild(li);
+    });
+    if (countList.childNodes.length) tldr.appendChild(countList);
+
+    if (Array.isArray(data.highlights) && data.highlights.length) {
+      var ol = el("ol", "highlights");
+      data.highlights.forEach(function (h) {
+        var li = el("li");
+        var text = typeof h === "string" ? h : h.text;
+        li.appendChild(richText(text));
+        if (h && h.finding) {
+          li.appendChild(document.createTextNode(" "));
+          var a = el("a", null, "[" + h.finding + "]");
+          a.href = "#" + h.finding;
+          li.appendChild(a);
+        }
+        ol.appendChild(li);
+      });
+      tldr.appendChild(ol);
+    }
+    root.appendChild(tldr);
+
+    if (data.agent_prompt) {
+      var ag = el("section", "agent");
+      var ah = el("div", "agent-head");
+      ah.appendChild(el("span", "agent-label", "Agent prompt"));
+      ah.appendChild(el("span", "agent-note",
+        findings.length + (findings.length === 1 ? " finding" : " findings") +
+        " · re-verify each against current code before applying"));
+      var ab = el("button", null, "Copy");
+      ab.type = "button";
+      ab.addEventListener("click", function () { copyText(data.agent_prompt, ab); });
+      ah.appendChild(ab);
+      ag.appendChild(ah);
+      var det = el("details");
+      det.appendChild(el("summary", null, "Read it"));
+      det.appendChild(el("pre", null, data.agent_prompt));
+      ag.appendChild(det);
+      root.appendChild(ag);
+    }
+
+    root.appendChild(el("h2", null, "Findings"));
+    if (!findings.length) {
+      root.appendChild(el("p", "empty", "No findings."));
+    } else {
+      var present = SEV_ORDER.filter(function (k) { return counts[k]; });
+      if (present.length > 1) {
+        var filters = el("div", "filters");
+        ["all"].concat(present).forEach(function (k) {
+          var b = el("button", "filter", k === "all" ? "All" : (k === "info" ? "Unscored" : k));
+          b.type = "button";
+          b.setAttribute("aria-pressed", k === "all" ? "true" : "false");
+          b.addEventListener("click", function () {
+            Array.prototype.forEach.call(filters.children, function (o) {
+              o.setAttribute("aria-pressed", o === b ? "true" : "false");
+            });
+            Array.prototype.forEach.call(list.children, function (card) {
+              card.hidden = k !== "all" && card.getAttribute("data-sev") !== k;
+            });
+          });
+          filters.appendChild(b);
+        });
+        root.appendChild(filters);
+      }
+      var list = el("div", "finding-list");
+      findings.forEach(function (f) { list.appendChild(renderFinding(f)); });
+      root.appendChild(list);
+    }
+
+    if (Array.isArray(data.coverage) && data.coverage.length) {
+      root.appendChild(el("h2", null, "Coverage gaps"));
+      var table = el("table");
+      var thead = el("thead");
+      var hr = el("tr");
+      ["Check", "Why it did not run", "Note"].forEach(function (h) { hr.appendChild(el("th", null, h)); });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      var tbody = el("tbody");
+      data.coverage.forEach(function (c) {
+        var tr = el("tr");
+        tr.appendChild(el("td", null, c.check || ""));
+        tr.appendChild(el("td", null, c.reason || ""));
+        tr.appendChild(el("td", null, c.note || ""));
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      root.appendChild(table);
+    }
+
+    var foot = el("footer");
+    foot.textContent = data.footer || ("Generated " + (data.generated || "") + (data.source ? " by " + data.source : "")).trim();
+    root.appendChild(foot);
+  }
+
+  var raw;
+  try {
+    raw = JSON.parse(document.getElementById("report-data").textContent);
+  } catch (e) {
+    document.getElementById("report").appendChild(
+      el("p", "empty", "Report data is not valid JSON: " + e.message)
+    );
+    return;
+  }
+  // An unrendered template still holds the placeholder string, so show the
+  // sample rather than an empty page - the layout is reviewable on its own.
+  render(typeof raw === "string" || raw === null ? DEMO : raw);
+})();
+</script>
+</body>
+</html>
