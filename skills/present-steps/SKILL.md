@@ -1,6 +1,8 @@
 ---
 name: present-steps
 description: 'Turn work that has to happen in a particular order into a runbook page - numbered steps, each with why it sits where it does, the commands to run, the check that proves it worked, and how to undo it. Use this whenever the user asks for "a runbook", "a plan", "the steps", "a remediation plan", "the deploy steps", "a release checklist", "a migration plan", "a cutover plan", "what do I fix first", or "walk me through doing this". Covers both cases: a pile of fixes after a review or an incident, where working out the order is the job, and an operational procedure like a deploy, release, migration or cutover, where the order is already known and the value is the verification and rollback on every step. It pairs with findings-report, which presents findings themselves - that skill answers what is wrong, this one answers what to do and in what order. Not for troubleshooting or diagnosis: those branch on what you observe, and a numbered list cannot express a decision tree.'
+model: sonnet
+effort: high
 ---
 
 # Present steps

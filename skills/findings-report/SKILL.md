@@ -1,6 +1,8 @@
 ---
 name: findings-report
 description: 'Turn findings that already exist into a single self-contained HTML page - a TL;DR, then one card per finding with what it is, why it matters, and how to fix it. Use this whenever the user asks to present, write up, summarise, or share findings from a review, audit, security scan, investigation, or debugging session, and whenever they ask for "a report", "a page", "an HTML summary", "something I can look at", or "something I can send to the team" about problems you or another tool found. Reach for it even when the user does not say the word "report" - if there is a list of problems and they want it presented rather than fixed, this is the skill.'
+model: sonnet
+effort: medium
 ---
 
 # Findings report
