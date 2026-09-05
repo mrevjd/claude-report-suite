@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+Both skills now pin the model and effort they run at, instead of inheriting whatever the invoking
+session happened to be on. Neither skill investigates: `findings-report` renders findings that
+already exist, and `present-steps` sequences work that has already been decided. Running either on
+the heaviest available model bought nothing and cost real budget, most often right after a review
+had already spent it.
+
+- `findings-report`: `model: sonnet`, `effort: medium`. Transcription and layout of findings that
+  arrived with the request.
+- `present-steps`: `model: sonnet`, `effort: high`. Higher effort because deriving an order is
+  actual reasoning (what blocks what, what worsens while you wait, what cannot be undone) rather
+  than transcription.
+
+Note that a `model: haiku` pin would not have worked here: Claude Code discards a skill-level
+`haiku` pin while auto mode is on, keeps the session model, and logs only a warning, so the skill
+would have looked pinned and silently run on whatever the session was using.
+
 ## 0.1.0
 
 First release. Two skills, `findings-report` and `present-steps`, built and evaluated together.

@@ -1,7 +1,7 @@
 {
   "name": "claude-report-suite",
   "description": "Presentation skills that turn findings and fixes into self-contained HTML pages: a findings report with a TL;DR and a re-verifiable agent prompt block, and an ordered runbook carrying why each step sits where it does, how to verify it and how to undo it",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Evan Davies",
     "email": "evan.davies@gmail.com"
