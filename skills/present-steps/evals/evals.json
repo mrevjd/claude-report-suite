@@ -16,7 +16,7 @@
         "Any irreversible step is flagged as irreversible"
       ],
       "files": [
-        "a findings.json produced by findings-report; substitute its path for {findings_json}"
+        "a findings.json produced by present-findings; substitute its path for {findings_json}"
       ]
     },
     {
