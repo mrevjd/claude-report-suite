@@ -1,6 +1,6 @@
 # claude-report-suite
 
-Two skills that present work rather than do it. `findings-report` answers *what is wrong*;
+Two skills that present work rather than do it. `present-findings` answers *what is wrong*;
 `present-steps` answers *what to do and in what order*. They compose: the report writes a
 `findings.json`, and the runbook reads the same file and keeps its finding ids.
 
@@ -17,14 +17,14 @@ findings stay on the machine that produced them.
 Or copy a single skill into `~/.claude/skills/`:
 
 ```bash
-rsync -a --exclude='evals/' skills/findings-report/ ~/.claude/skills/findings-report/
+rsync -a --exclude='evals/' skills/present-findings/ ~/.claude/skills/present-findings/
 ```
 
 ## Skills
 
 | Skill | Use it when |
 |---|---|
-| `findings-report` | Findings exist and need presenting: a review, an audit, a scanner dump, a debugging session. Produces a TL;DR, a card per finding with what/why/fix, a coverage section for what did not run, and an optional agent prompt block. |
+| `present-findings` | Findings exist and need presenting: a review, an audit, a scanner dump, a debugging session. Produces a TL;DR, a card per finding with what/why/fix, a coverage section for what did not run, and an optional agent prompt block. |
 | `present-steps` | Work has to happen in an order. Produces numbered steps carrying why each sits where it does, the commands, a verification with what a good result looks like, and a rollback. Handles both a pile of fixes where the order must be derived, and an operational procedure where it is already given. |
 
 Neither investigates. The findings must already exist; these skills present what a review produced.
@@ -35,8 +35,8 @@ Each skill is a template plus a marker-injection script. The model's job is the 
 is where the judgement lives; the script renders it:
 
 ```bash
-skills/findings-report/scripts/render.sh \
-  skills/findings-report/assets/report-template.html findings.json report.html
+skills/present-findings/scripts/render.sh \
+  skills/present-findings/assets/report-template.html findings.json report.html
 ```
 
 `render.sh` is bash with no dependencies: no sed (backslashes and ampersands are routine inside
@@ -74,7 +74,7 @@ skills/<name>/evals/evals.json  eval prompts and expectations, excluded from the
 Evals live in `skills/<name>/evals/evals.json`, each carrying the prompt, a description of the
 expected output, and the expectations it is graded against.
 
-They were run with skill-creator. `findings-report` went through two iterations of three evals
+They were run with skill-creator. `present-findings` went through two iterations of three evals
 against an unaided baseline; the discriminators turned out to be narrow, since a capable model
 writes a good page unaided, and what the skill actually buys is a re-renderable payload, a
 consistent layout across runs, and scope discipline. `present-steps` went through four: three

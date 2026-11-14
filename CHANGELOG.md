@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Renamed the `findings-report` skill to `present-findings`, so both skills share the `present-`
+  prefix. Invoke it as `claude-report-suite:present-findings`; the old name no longer resolves. A
+  manual install under `~/.claude/skills/findings-report/` needs removing and re-copying from
+  `skills/present-findings/`. The default output filename is unchanged.
+
 ## 0.2.0
 
 Both skills now pin the model and effort they run at, instead of inheriting whatever the invoking
