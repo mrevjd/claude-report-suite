@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - Renamed the `findings-report` skill to `present-findings`, so both skills share the `present-`
   prefix. Invoke it as `claude-report-suite:present-findings`; the old name no longer resolves. A
